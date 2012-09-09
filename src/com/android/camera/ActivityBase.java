@@ -16,10 +16,12 @@
 
 package com.android.camera;
 
+
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.IntentFilter;
 import android.graphics.Rect;
 import android.hardware.Camera.Parameters;
@@ -143,6 +145,19 @@ abstract public class ActivityBase extends AbstractGalleryActivity
 
     public boolean isPanoramaActivity() {
         return false;
+    }
+
+    protected boolean powerShutter(ComboPreferences prefs) {
+        prefs.setLocalId(getApplicationContext(), 0);
+        String val = prefs.getString(CameraSettings.KEY_POWER_SHUTTER,
+                getResources().getString(R.string.pref_camera_power_shutter_default));
+        if (val.equals(CameraSettings.VALUE_ON)){
+            getWindow().addFlags(WindowManager.LayoutParams.PREVENT_POWER_KEY);
+            return true;
+        }else{
+            getWindow().clearFlags(WindowManager.LayoutParams.PREVENT_POWER_KEY);
+            return false;
+        }
     }
 
     @Override

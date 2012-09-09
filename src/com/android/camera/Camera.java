@@ -1215,6 +1215,7 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
         mPreferences = new ComboPreferences(this);
         CameraSettings.upgradeGlobalPreferences(mPreferences.getGlobal());
         mCameraId = getPreferredCameraId(mPreferences);
+	powerShutter(mPreferences);
 
         mContentResolver = getContentResolver();
 
@@ -1292,6 +1293,7 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                 CameraSettings.KEY_SCENE_MODE};
         final String[] OTHER_SETTING_KEYS = {
                 CameraSettings.KEY_RECORD_LOCATION,
+                CameraSettings.KEY_POWER_SHUTTER,
                 CameraSettings.KEY_PICTURE_SIZE,
                 CameraSettings.KEY_FOCUS_MODE};
 
@@ -1861,6 +1863,12 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
                     mShutterButton.setPressed(true);
                 }
                 return true;
+            case KeyEvent.KEYCODE_POWER:
+                if (mFirstTimeInitialized && event.getRepeatCount() == 0
+                        && powerShutter(mPreferences)) {
+                    onShutterButtonFocus(true);
+                }
+                return true;
         }
 
         return super.onKeyDown(keyCode, event);
@@ -1872,6 +1880,11 @@ public class Camera extends ActivityBase implements FocusManager.Listener,
             case KeyEvent.KEYCODE_FOCUS:
                 if (mFirstTimeInitialized) {
                     onShutterButtonFocus(false);
+                }
+                return true;
+            case KeyEvent.KEYCODE_POWER:
+                if (powerShutter(mPreferences)) {
+                    onShutterButtonClick();
                 }
                 return true;
         }

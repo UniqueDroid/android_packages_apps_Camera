@@ -331,6 +331,7 @@ public class VideoCamera extends ActivityBase
         mPreferences = new ComboPreferences(this);
         CameraSettings.upgradeGlobalPreferences(mPreferences.getGlobal());
         mCameraId = getPreferredCameraId(mPreferences);
+        powerShutter(mPreferences);
 
         mPreferences.setLocalId(this, mCameraId);
         CameraSettings.upgradeLocalPreferences(mPreferences.getLocal());
@@ -443,7 +444,8 @@ public class VideoCamera extends ActivityBase
                     CameraSettings.KEY_VIDEO_TIME_LAPSE_FRAME_INTERVAL,
                     CameraSettings.KEY_VIDEO_QUALITY};
         final String[] OTHER_SETTING_KEYS = {
-                    CameraSettings.KEY_RECORD_LOCATION};
+                    CameraSettings.KEY_RECORD_LOCATION,
+                    CameraSettings.KEY_POWER_SHUTTER};
 
         CameraPicker.setImageResourceId(R.drawable.ic_switch_video_facing_holo_light);
         mIndicatorControlContainer.initialize(this, mPreferenceGroup,
@@ -719,6 +721,9 @@ public class VideoCamera extends ActivityBase
         } else {  // Driver supports separates outputs for preview and video.
             List<Size> sizes = mParameters.getSupportedPreviewSizes();
             Size preferred = mParameters.getPreferredPreviewSizeForVideo();
+            if (preferred == null) {
+                preferred = sizes.get(0);
+            }
             int product = preferred.width * preferred.height;
             Iterator<Size> it = sizes.iterator();
             // Remove the preview sizes that are not preferred.
@@ -851,7 +856,6 @@ public class VideoCamera extends ActivityBase
             stopPreview();
             if (effectsActive() && mEffectsRecorder != null) {
                 mEffectsRecorder.release();
-                mEffectsRecorder = null;
             }
         }
 
@@ -885,15 +889,13 @@ public class VideoCamera extends ActivityBase
     // Closing the effects out. Will shut down the effects graph.
     private void closeEffects() {
         Log.v(TAG, "Closing effects");
-        mEffectType = EffectsRecorder.EFFECT_NONE;
         if (mEffectsRecorder == null) {
             Log.d(TAG, "Effects are already closed. Nothing to do");
-            return;
         }
         // This call can handle the case where the camera is already released
         // after the recording has been stopped.
         mEffectsRecorder.release();
-        mEffectsRecorder = null;
+        mEffectType = EffectsRecorder.EFFECT_NONE;
     }
 
     // By default, we want to close the effects as well with the camera.
@@ -923,8 +925,10 @@ public class VideoCamera extends ActivityBase
             // Disconnect the camera from effects so that camera is ready to
             // be released to the outside world.
             mEffectsRecorder.disconnectCamera();
+            if (closeEffectsAlso) {
+                closeEffects();
+            }
         }
-        if (closeEffectsAlso) closeEffects();
         mCameraDevice.setZoomChangeListener(null);
         mCameraDevice.setErrorCallback(null);
         CameraHolder.instance().release();
@@ -1036,6 +1040,11 @@ public class VideoCamera extends ActivityBase
         switch (keyCode) {
             case KeyEvent.KEYCODE_CAMERA:
                 mShutterButton.setPressed(false);
+                return true;
+            case KeyEvent.KEYCODE_POWER:
+                if (powerShutter(mPreferences)) {
+                    onShutterButtonClick();
+                }
                 return true;
         }
         return super.onKeyUp(keyCode, event);
@@ -1288,8 +1297,8 @@ public class VideoCamera extends ActivityBase
             cleanupEmptyFile();
             mEffectsRecorder.release();
             mEffectsRecorder = null;
+            mEffectType = EffectsRecorder.EFFECT_NONE;
         }
-        mEffectType = EffectsRecorder.EFFECT_NONE;
         mVideoFilename = null;
     }
 
@@ -1777,6 +1786,10 @@ public class VideoCamera extends ActivityBase
         return supported == null ? false : supported.indexOf(value) >= 0;
     }
 
+    private void setCameraHardwareParameters() {
+        mCameraDevice.setParameters(mParameters);
+    }
+
     @SuppressWarnings("deprecation")
     private void setCameraParameters() {
         mParameters.setPreviewSize(mDesiredPreviewWidth, mDesiredPreviewHeight);
@@ -2149,7 +2162,6 @@ public class VideoCamera extends ActivityBase
                     stopPreview();
                 } else {
                     mEffectsRecorder.release();
-                    mEffectsRecorder = null;
                 }
                 resizeForPreviewAspectRatio();
                 startPreview(); // Parameters will be set in startPreview().
